@@ -315,13 +315,15 @@ else:
 
 # --- Clean Top Header Banner ---
 st.markdown("""
+<center>
 <div class="hero-banner">
     <div>
-        <center><h1 class="hero-title">Logistics Command Center</h1></center>
+        <h1 class="hero-title">Logistics Command Center</h1>
         
     </div>
-    <div class="sync-pill">● Google Sheets Live Sync</div>
+    
 </div>
+</center>
 """, unsafe_allow_html=True)
 
 # --- KPI Summary Bar (6 Engaging Cards) ---

@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+import requests
 from datetime import date
 import urllib.parse
 import uuid
@@ -12,7 +11,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Expected columns in Google Sheet
 COLUMNS = [
     "id",
     "direction",
@@ -27,7 +25,7 @@ COLUMNS = [
     "current_status"
 ]
 
-# Official Courier Tracking Websites (Fallback if Tracking Link is left blank)
+# Official Courier Tracking Portals (Used automatically if Tracking Link is left blank)
 COURIER_URLS = {
     "Delhivery": lambda d: f"https://www.delhivery.com/track/package/{urllib.parse.quote(d)}",
     "Blue Dart": lambda d: "https://www.bluedart.com/tracking",
@@ -43,60 +41,51 @@ COURIER_URLS = {
     "Other": lambda d: f"https://www.google.com/search?q={urllib.parse.quote(d + ' courier tracking')}"
 }
 
-@st.cache_resource
-def get_worksheet():
-    """Connects to Google Sheets using Streamlit Secrets and ensures headers exist."""
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
-    client = gspread.authorize(creds)
-    sheet_url = st.secrets["sheet_url"]
-    sh = client.open_by_url(sheet_url)
-    ws = sh.get_worksheet(0)
+# Read the Google Apps Script Web App URL from Streamlit Secrets
+WEBAPP_URL = st.secrets.get("webapp_url", "")
 
-    # Auto-create header row if the Google Sheet is empty
-    existing_headers = ws.row_values(1)
-    if existing_headers != COLUMNS:
-        if not existing_headers:
-            ws.append_row(COLUMNS)
-        else:
-            ws.update(range_name="A1:K1", values=[COLUMNS])
-    return ws
+if not WEBAPP_URL:
+    st.error("⚠️ Please add `webapp_url` to your Streamlit Cloud Secrets to connect your Google Sheet.")
+    st.stop()
 
-def load_data(ws) -> pd.DataFrame:
-    records = ws.get_all_records()
-    if not records:
+@st.cache_data(ttl=15, show_spinner=False)
+def fetch_consignments() -> pd.DataFrame:
+    """Fetches all rows from the Google Sheet via the Apps Script Web App URL."""
+    response = requests.get(WEBAPP_URL, timeout=15)
+    response.raise_for_status()
+    data = response.json()
+    if not data:
         return pd.DataFrame(columns=COLUMNS)
-    df = pd.DataFrame(records)
+    df = pd.DataFrame(data)
     for col in COLUMNS:
         if col not in df.columns:
             df[col] = ""
     return df.astype(str)
 
+def post_to_sheet(payload: dict):
+    """Sends an add, update_status, or delete command to the Google Sheet."""
+    response = requests.post(WEBAPP_URL, json=payload, timeout=15)
+    response.raise_for_status()
+    fetch_consignments.clear()  # Clear cache so fresh data loads immediately
+    return response.json()
+
 def resolve_tracking_link(courier: str, docket: str, custom_link: str) -> str:
-    """Uses the user's custom tracking link if provided; otherwise opens the courier's tracking portal."""
     if custom_link and custom_link.strip():
         link = custom_link.strip()
         return link if link.startswith(("http://", "https://")) else f"https://{link}"
     builder = COURIER_URLS.get(courier, COURIER_URLS["Other"])
     return builder(docket.strip())
 
-# --- Connect to Google Sheet ---
+# --- Load Data ---
 try:
-    worksheet = get_worksheet()
-    df = load_data(worksheet)
+    df = fetch_consignments()
 except Exception as e:
-    st.error("⚠️ Google Sheets connection not configured yet. Please check your Streamlit Secrets setup.")
+    st.error(f"Failed to load data from Google Sheet Web App: {e}")
     st.stop()
 
-# --- Clean Header ---
+# --- Header ---
 st.title("📦 Consignment Command Center")
-st.caption("Live Inward & Outward Courier Register — Backed by Google Sheets")
+st.caption("Inward & Outward Courier Dispatch Register — Synced with Google Sheets")
 
 # --- KPI Summary Bar ---
 total_count = len(df)
@@ -138,26 +127,27 @@ with st.container(border=True):
             docket_number = st.text_input("5. Docket / AWB Number *", placeholder="e.g., 78491024812")
             current_status = st.text_input("10. Current Status (Manual) *", value="Dispatched")
 
-        submitted = st.form_submit_button("➕ Save Consignment to Google Sheets", type="primary")
+        submitted = st.form_submit_button("➕ Save Consignment", type="primary")
 
         if submitted:
             if not item_name.strip() or not docket_number.strip():
                 st.warning("Please enter both the Item / Consignment Name and the Docket Number.")
             else:
-                new_row = [
-                    f"c-{uuid.uuid4().hex[:8]}",
-                    direction,
-                    item_name.strip(),
-                    vendor_name.strip(),
-                    courier_service,
-                    docket_number.strip(),
-                    location.strip(),
-                    str(dispatch_date),
-                    str(expected_date),
-                    tracking_link.strip(),
-                    current_status.strip()
-                ]
-                worksheet.append_row(new_row, value_input_option="USER_ENTERED")
+                record = {
+                    "id": f"c-{uuid.uuid4().hex[:8]}",
+                    "direction": direction,
+                    "item_name": item_name.strip(),
+                    "vendor_name": vendor_name.strip(),
+                    "courier_service": courier_service,
+                    "docket_number": docket_number.strip(),
+                    "location": location.strip(),
+                    "dispatch_date": str(dispatch_date),
+                    "expected_date": str(expected_date),
+                    "tracking_link": tracking_link.strip(),
+                    "current_status": current_status.strip()
+                }
+                with st.spinner("Saving to Google Sheets..."):
+                    post_to_sheet({"action": "add", "data": record})
                 st.toast(f"Saved {item_name} to Google Sheets!")
                 st.rerun()
 
@@ -169,7 +159,10 @@ with f_col1:
         placeholder="Filter by item name, vendor, docket number, courier, location, or status..."
     )
 with f_col2:
-    direction_filter = st.selectbox("Filter Movement", ["All", "Inward", "Outward", "In Transit Only", "Delivered Only"])
+    direction_filter = st.selectbox(
+        "Filter Movement",
+        ["All", "Inward", "Outward", "In Transit Only", "Delivered Only"]
+    )
 
 filtered_df = df.copy()
 if not filtered_df.empty:
@@ -192,10 +185,7 @@ st.subheader(f"Consignment Register ({len(filtered_df)})")
 if filtered_df.empty:
     st.info("No consignments match your current view.")
 else:
-    # Show newest entries at the top
-    for idx, row in filtered_df.iloc[::-1].iterrows():
-        sheet_row_number = idx + 2  # Row 1 is headers, DataFrame index starts at 0
-
+    for _, row in filtered_df.iloc[::-1].iterrows():
         with st.container(border=True):
             c_details, c_route, c_status, c_actions = st.columns([3, 2.3, 2.7, 2.2])
 
@@ -203,7 +193,7 @@ else:
                 badge = "📥 **INWARD**" if row["direction"] == "Inward" else "📤 **OUTWARD**"
                 st.markdown(f"{badge} &nbsp;|&nbsp; **{row['item_name']}**")
                 st.caption(f"🏢 Vendor: **{row['vendor_name']}** &nbsp;•&nbsp; 🚚 Courier: **{row['courier_service']}**")
-                # st.code gives a one-click Copy button for pasting the Docket # on the courier site
+                # One-click copyable Docket Number box
                 st.code(row["docket_number"], language=None)
 
             with c_route:
@@ -218,26 +208,34 @@ else:
                     key=f"status_{row['id']}"
                 )
                 if st.button("💾 Save Status", key=f"save_{row['id']}", use_container_width=True):
-                    # Column K (11) is current_status
-                    worksheet.update_cell(sheet_row_number, 11, new_status.strip())
+                    with st.spinner("Updating status..."):
+                        post_to_sheet({
+                            "action": "update_status",
+                            "id": row["id"],
+                            "current_status": new_status.strip()
+                        })
                     st.toast(f"Status updated for Docket #{row['docket_number']}")
                     st.rerun()
 
             with c_actions:
-                st.write("")  # Vertical alignment spacer
+                st.write("")
                 tracking_url = resolve_tracking_link(
                     row["courier_service"],
                     row["docket_number"],
                     row["tracking_link"]
                 )
-                # Direct button to open the Courier Website
+                # Direct button to launch the Courier Tracking Website
                 st.link_button(
                     f"🚀 Track on {row['courier_service']} ↗",
                     url=tracking_url,
                     use_container_width=True,
-                    help=f"Opens {row['courier_service']} tracking page in a new tab"
+                    help=f"Opens {row['courier_service']} tracking website in a new tab"
                 )
                 if st.button("🗑️ Delete Item", key=f"del_{row['id']}", use_container_width=True):
-                    worksheet.delete_rows(sheet_row_number)
+                    with st.spinner("Deleting item..."):
+                        post_to_sheet({
+                            "action": "delete",
+                            "id": row["id"]
+                        })
                     st.toast(f"Deleted {row['item_name']}")
                     st.rerun()

@@ -317,7 +317,7 @@ else:
 st.markdown("""
 <div class="hero-banner">
     <div>
-        <centre><h1 class="hero-title">Logistics Command Center</h1></centre>
+        <center><h1 class="hero-title">Logistics Command Center</h1></center>
         
     </div>
     <div class="sync-pill">● Google Sheets Live Sync</div>

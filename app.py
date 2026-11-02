@@ -6,7 +6,7 @@ import urllib.parse
 import uuid
 
 st.set_page_config(
-    page_title="Consignment Command Center",
+    page_title="Logistics Command Center",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -317,8 +317,8 @@ else:
 st.markdown("""
 <div class="hero-banner">
     <div>
-        <h1 class="hero-title">📦 Consignment Command Center</h1>
-        <p class="hero-subtitle">Inward & Outward Courier Dispatch Register • Color-Coded & SLA Monitored</p>
+        <centre><h1 class="hero-title">Logistics Command Center</h1></centre>
+        
     </div>
     <div class="sync-pill">● Google Sheets Live Sync</div>
 </div>

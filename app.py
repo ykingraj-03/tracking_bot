@@ -316,13 +316,11 @@ else:
 # --- Clean Top Header Banner ---
 st.markdown("""
 <center>
-<div class="hero-banner">
-    <div>
-        <h1 class="hero-title">Logistics Command Center</h1>
-        
+    <div class="hero-banner">
+        <div>
+            <h1 class="hero-title">Logistics Command Center</h1>
+        </div>
     </div>
-    
-</div>
 </center>
 """, unsafe_allow_html=True)
 

@@ -6,11 +6,15 @@ import urllib.parse
 import uuid
 
 st.set_page_config(
-    page_title="Logistic Command Center",
+    page_title="Consignment Command Center",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Session state set to immediately hide items set to Inactive before the next cache refresh
+if "inactive_ids" not in st.session_state:
+    st.session_state["inactive_ids"] = set()
 
 # --- Colorful Light Mode UI Styling ---
 st.markdown("""
@@ -107,7 +111,6 @@ st.markdown("""
     .pill-inward { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
     .pill-outward { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
     .pill-overdue { background: #ffe4e6; color: #be123c; border: 1px solid #fda4af; }
-    .pill-delivered { background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +127,7 @@ COLUMNS = [
     "delivery_date",
     "tracking_link",
     "current_status",
-    "is_deleted"
+    "flag"
 ]
 
 COURIER_URLS = {
@@ -142,22 +145,13 @@ COURIER_URLS = {
     "Other": lambda d: f"https://www.google.com/search?q={urllib.parse.quote(d + ' courier tracking')}"
 }
 
-STATUS_OPTIONS = [
-    "Dispatched",
-    "In Transit",
-    "Reached Local Hub",
-    "Out for Delivery",
-    "Delivered",
-    "Delayed / Exception"
-]
-
 WEBAPP_URL = st.secrets.get("webapp_url", "")
 
 if not WEBAPP_URL:
     st.error("⚠️ Please add `webapp_url` in your Streamlit Cloud Secrets to connect to Google Sheets.")
     st.stop()
 
-@st.cache_data(ttl=15, show_spinner=False)
+@st.cache_data(ttl=10, show_spinner=False)
 def fetch_consignments() -> pd.DataFrame:
     response = requests.get(WEBAPP_URL, timeout=15)
     response.raise_for_status()
@@ -167,10 +161,10 @@ def fetch_consignments() -> pd.DataFrame:
     df = pd.DataFrame(data)
     for col in COLUMNS:
         if col not in df.columns:
-            df[col] = ""
+            df[col] = "Active" if col == "flag" else ""
     return df.astype(str)
 
-def post_to_sheet(payload: dict):
+def post_to_sheet(payload: dict) -> dict:
     response = requests.post(WEBAPP_URL, json=payload, timeout=15)
     response.raise_for_status()
     fetch_consignments.clear()
@@ -203,16 +197,21 @@ def evaluate_row(row):
     is_overdue = (days_diff > 0) and (not is_delivered)
     return is_overdue, days_diff, is_delivered
 
-# --- Load & Filter Active (Non-Deleted) Consignments ---
+# --- Load Data & Filter by flag == "Active" ---
 try:
     raw_df = fetch_consignments()
 except Exception as e:
     st.error(f"Failed to connect to Google Sheet Web App: {e}")
     st.stop()
 
-# Filter out rows that were soft-deleted on the frontend (they remain in Google Sheets)
 if not raw_df.empty:
-    df = raw_df[~raw_df["is_deleted"].str.strip().str.upper().isin(["TRUE", "1", "YES"])].copy()
+    # Normalize blank flags to "Active"
+    raw_df["flag"] = raw_df["flag"].astype(str).str.strip().replace({"": "Active", "nan": "Active", "None": "Active"})
+    # Only show rows where flag is "Active" AND not just marked inactive in this session
+    df = raw_df[
+        (raw_df["flag"].str.lower() == "active") &
+        (~raw_df["id"].isin(st.session_state["inactive_ids"]))
+    ].copy()
 else:
     df = pd.DataFrame(columns=COLUMNS)
 
@@ -240,9 +239,10 @@ if not df.empty:
 st.markdown("""
 <div class="hero-banner">
     <div>
-        <h1 class="hero-title">Logistic Command Center</h1>
+        <h1 class="hero-title">📦 Consignment & Courier Command Center</h1>
+        <p class="hero-subtitle">Compact Tabular Tracker • Active/Inactive Flag Sync with Google Sheets</p>
     </div>
-    <div class="sync-pill">● Connected to Google Sheets</div>
+    <div class="sync-pill">● Flag Filter: Showing Active Only</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -256,7 +256,7 @@ active_count = total_count - delivered_count
 
 k1, k2, k3, k4, k5, k6 = st.columns(6)
 with k1:
-    st.markdown(f'<div class="kpi-card kpi-all"><div class="kpi-label">Total Active</div><div class="kpi-value">{total_count}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-all"><div class="kpi-label">Active Tracked</div><div class="kpi-value">{total_count}</div></div>', unsafe_allow_html=True)
 with k2:
     st.markdown(f'<div class="kpi-card kpi-inward"><div class="kpi-label">📥 Inward (Recv)</div><div class="kpi-value">{inward_count}</div></div>', unsafe_allow_html=True)
 with k3:
@@ -276,7 +276,7 @@ if overdue_count > 0:
 
 st.write("")
 
-# --- Collapsible Add New Consignment Form (Keeps Table Front-and-Center) ---
+# --- Collapsible Add New Consignment Form ---
 with st.expander("➕ Register New Consignment (Click to Expand / Collapse)", expanded=(total_count == 0)):
     with st.form("add_consignment_form", clear_on_submit=True):
         c1, c2, c3, c4 = st.columns(4)
@@ -297,7 +297,7 @@ with st.expander("➕ Register New Consignment (Click to Expand / Collapse)", ex
             tracking_link = st.text_input("10. Tracking Link (Optional)", placeholder="Leave blank for auto courier link")
             current_status = st.text_input("11. Current Status (Manual) *", value="Dispatched")
 
-        submitted = st.form_submit_button("✅ Save Consignment to Google Sheets", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("✅ Save Consignment (Flag = Active)", type="primary", use_container_width=True)
         if submitted:
             if not item_name.strip() or not docket_number.strip():
                 st.warning("Please enter both Item Name and Docket Number.")
@@ -315,11 +315,11 @@ with st.expander("➕ Register New Consignment (Click to Expand / Collapse)", ex
                     "delivery_date": str(delivery_date_val) if has_deliv else "",
                     "tracking_link": tracking_link.strip(),
                     "current_status": "Delivered" if has_deliv and current_status == "Dispatched" else current_status.strip(),
-                    "is_deleted": "FALSE"
+                    "flag": "Active"
                 }
-                with st.spinner("Saving to Google Sheets..."):
+                with st.spinner("Saving to Google Sheets with Flag = Active..."):
                     post_to_sheet({"action": "add", "data": record})
-                st.toast(f"Added {item_name}!")
+                st.toast(f"Added {item_name} (Flag: Active)!")
                 st.rerun()
 
 # --- Search & Filter Controls ---
@@ -360,14 +360,13 @@ if not filtered_df.empty:
         )
         filtered_df = filtered_df[mask]
 
-    # Show newest entries at top of table
     filtered_df = filtered_df.iloc[::-1].reset_index(drop=True)
 
 # --- Compact Color-Coded Tabular View ---
 st.markdown("""
 <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; margin: 6px 0 8px 0;">
     <div style="font-size:1.1rem; font-weight:800; color:#1e293b;">
-        📋 Consignment Tracking Table <span style="font-size:0.82rem; font-weight:500; color:#64748b;">(Click any row's checkbox on the left to Edit Details, Add Delivery Date, or Hide)</span>
+        📋 Active Consignment Table <span style="font-size:0.82rem; font-weight:500; color:#64748b;">(Select any row checkbox on the left to Edit, Add Delivery Date, or Set Flag to Inactive)</span>
     </div>
     <div>
         <span class="legend-pill pill-inward">📥 Inward Row</span>
@@ -378,7 +377,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if filtered_df.empty:
-    st.info("No consignments match your current filter.")
+    st.info("No active consignments match your current filter.")
 else:
     display_cols = [
         "direction",
@@ -392,24 +391,21 @@ else:
         "clean_delivery",
         "current_status",
         "sla_tag",
+        "flag",
         "resolved_url"
     ]
     table_df = filtered_df[display_cols].copy()
 
-    # Color-code each row based on Overdue vs Inward vs Outward
     def style_table_rows(row_series):
         idx = row_series.name
         is_ovd = bool(filtered_df.loc[idx, "is_overdue"])
         direction_val = filtered_df.loc[idx, "direction"]
 
         if is_ovd:
-            # Rose Red highlight for overdue orders
             return ["background-color: #ffe4e6; color: #9f1239; font-weight: 600;"] * len(row_series)
         elif direction_val == "Inward":
-            # Soft Sky Cyan for Inward
             return ["background-color: #e0f2fe; color: #0c4a6e;"] * len(row_series)
         else:
-            # Soft Warm Amber for Outward
             return ["background-color: #fef3c7; color: #78350f;"] * len(row_series)
 
     styled_table = table_df.style.apply(style_table_rows, axis=1)
@@ -432,6 +428,7 @@ else:
             "clean_delivery": st.column_config.TextColumn("Delivered On", width="small"),
             "current_status": st.column_config.TextColumn("Current Status", width="medium"),
             "sla_tag": st.column_config.TextColumn("SLA State", width="small"),
+            "flag": st.column_config.TextColumn("Sheet Flag", width="small"),
             "resolved_url": st.column_config.LinkColumn(
                 "Track Portal",
                 display_text="🚀 Track ↗",
@@ -440,42 +437,57 @@ else:
         }
     )
 
-    # --- Edit / Add Delivery Date / Soft-Delete Panel ---
+    # --- Edit / Add Delivery Date / Set Flag to Inactive Panel ---
     st.markdown("---")
-    st.markdown("#### ✏️ Edit Consignment Details, Add Delivery Date, or Remove from View")
+    st.markdown("#### ✏️ Edit Consignment Details, Add Delivery Date, or Delete from Frontend")
 
-    # Determine which item is selected (via table click or dropdown selector)
     selected_rows = selection_event.selection.rows if selection_event and selection_event.selection else []
     options_map = {
         f"[{r['direction']}] {r['item_name']} — Docket #{r['docket_number']} ({r['courier_service']})": idx
         for idx, r in filtered_df.iterrows()
     }
     option_labels = list(options_map.keys())
-    default_idx = selected_rows[0] if selected_rows else 0
+    default_idx = selected_rows[0] if selected_rows and selected_rows[0] < len(option_labels) else 0
 
     chosen_label = st.selectbox(
-        "Selected Consignment (Click a row in the table above or pick from this list):",
+        "Selected Consignment (Click a row checkbox in the table above or pick from this list):",
         options=option_labels,
         index=default_idx
     )
     selected_row = filtered_df.loc[options_map[chosen_label]]
 
     with st.container(border=True):
-        top_bar_col1, top_bar_col2, top_bar_col3 = st.columns([2.5, 1.5, 1.2])
+        top_bar_col1, top_bar_col2, top_bar_col3 = st.columns([2.4, 1.4, 1.4])
         with top_bar_col1:
-            st.markdown(f"**Editing:** `{selected_row['item_name']}` &nbsp;|&nbsp; **Docket #:** `{selected_row['docket_number']}`")
+            st.markdown(
+                f"**Selected:** `{selected_row['item_name']}` &nbsp;|&nbsp; **Docket #:** `{selected_row['docket_number']}` &nbsp;|&nbsp; **Flag:** `{selected_row['flag']}`"
+            )
         with top_bar_col2:
             st.link_button(
-                f"🚀 Open {selected_row['courier_service']} Tracking Page ↗",
+                f"🚀 Track on {selected_row['courier_service']} ↗",
                 url=selected_row["resolved_url"],
                 use_container_width=True
             )
         with top_bar_col3:
-            if st.button("🗑️ Remove from List (Keep in Sheet)", key=f"soft_del_{selected_row['id']}", use_container_width=True):
-                with st.spinner("Hiding from frontend (keeping record in Google Sheets)..."):
-                    post_to_sheet({"action": "soft_delete", "id": selected_row["id"]})
-                st.toast(f"Removed '{selected_row['item_name']}' from view (data preserved in Google Sheet).")
-                st.rerun()
+            if st.button(
+                "🗑️ Delete from Frontend (Set Inactive)",
+                key=f"inactivate_{selected_row['id']}",
+                use_container_width=True
+            ):
+                with st.spinner("Setting flag to 'Inactive' in Google Sheets..."):
+                    res = post_to_sheet({
+                        "action": "set_inactive",
+                        "id": selected_row["id"]
+                    })
+                if res.get("status") == "success":
+                    st.session_state["inactive_ids"].add(selected_row["id"])
+                    st.toast(f"'{selected_row['item_name']}' hidden from frontend (Flag set to Inactive in Sheet).")
+                    st.rerun()
+                else:
+                    st.error(
+                        f"Google Sheet could not update the flag ({res.get('message')}). "
+                        "Make sure you deployed a New Version of your Apps Script!"
+                    )
 
         with st.form(key=f"edit_form_{selected_row['id']}"):
             e1, e2, e3, e4 = st.columns(4)
@@ -516,8 +528,7 @@ else:
                 edit_link = st.text_input("Tracking Link", value=selected_row["tracking_link"])
                 edit_status = st.text_input(
                     "Current Status (Manual)",
-                    value=selected_row["current_status"],
-                    help="Tip: Setting a Delivery Date or typing 'Delivered' marks this shipment as completed."
+                    value=selected_row["current_status"]
                 )
 
             save_changes = st.form_submit_button("💾 Save Updated Details to Google Sheets", type="primary", use_container_width=True)
@@ -539,7 +550,7 @@ else:
                     "delivery_date": str(edit_delivery_date) if record_delivery else "",
                     "tracking_link": edit_link.strip(),
                     "current_status": final_status,
-                    "is_deleted": "FALSE"
+                    "flag": "Active"
                 }
                 with st.spinner("Updating record in Google Sheets..."):
                     post_to_sheet({

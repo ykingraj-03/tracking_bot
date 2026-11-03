@@ -6,204 +6,108 @@ import urllib.parse
 import uuid
 
 st.set_page_config(
-    page_title="Logistics Command Center",
+    page_title="Consignment Command Center",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom Dark Glassmorphic & Row Color-Coding CSS ---
+# --- Colorful Light Mode UI Styling ---
 st.markdown("""
 <style>
-    /* Main App Dark Theme Background */
     .stApp {
-        background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 45%, #020617 100%);
-        color: #f8fafc;
+        background: linear-gradient(180deg, #f0f4ff 0%, #f8fafc 40%, #ffffff 100%);
+        color: #0f172a;
     }
-
-    /* Hide default Streamlit top decoration bar */
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
 
-    /* Hero Banner */
+    /* Colorful Top Header Banner */
     .hero-banner {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
-        border: 1px solid rgba(99, 102, 241, 0.3);
+        background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
         border-radius: 16px;
-        padding: 20px 26px;
-        margin-bottom: 22px;
+        padding: 18px 24px;
+        margin-bottom: 18px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+        color: #ffffff;
+        box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
     }
     .hero-title {
-        font-size: 1.55rem;
+        font-size: 1.5rem;
         font-weight: 800;
-        letter-spacing: -0.02em;
-        color: #ffffff;
         margin: 0;
+        color: #ffffff !important;
     }
     .hero-subtitle {
         font-size: 0.85rem;
-        color: #94a3b8;
-        margin-top: 4px;
+        color: #e0f2fe;
+        margin-top: 2px;
     }
     .sync-pill {
-        background: rgba(16, 185, 129, 0.12);
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        color: #34d399;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        color: #ffffff;
         font-size: 0.75rem;
-        font-weight: 600;
+        font-weight: 700;
         padding: 6px 14px;
         border-radius: 999px;
     }
 
-    /* Custom KPI Cards */
+    /* Colorful Light KPI Cards */
     .kpi-card {
-        background: rgba(30, 41, 59, 0.7);
-        border: 1px solid rgba(148, 163, 184, 0.18);
         border-radius: 14px;
-        padding: 16px 18px;
-        transition: transform 0.15s ease, border-color 0.15s ease;
-    }
-    .kpi-card:hover {
-        transform: translateY(-2px);
+        padding: 14px 16px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+        border: 1px solid rgba(15, 23, 42, 0.08);
     }
     .kpi-label {
         font-size: 0.72rem;
-        font-weight: 700;
+        font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin-bottom: 6px;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
     }
     .kpi-value {
-        font-size: 1.75rem;
+        font-size: 1.65rem;
         font-weight: 800;
-        color: #f8fafc;
         line-height: 1.1;
     }
-    .kpi-all { border-top: 3px solid #6366f1; }
-    .kpi-inward { border-top: 3px solid #06b6d4; background: linear-gradient(180deg, rgba(6, 182, 212, 0.08) 0%, rgba(30, 41, 59, 0.7) 100%); }
-    .kpi-outward { border-top: 3px solid #f59e0b; background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, rgba(30, 41, 59, 0.7) 100%); }
-    .kpi-transit { border-top: 3px solid #3b82f6; }
-    .kpi-overdue { border-top: 3px solid #f43f5e; background: linear-gradient(180deg, rgba(244, 63, 94, 0.15) 0%, rgba(30, 41, 59, 0.75) 100%); }
-    .kpi-delivered { border-top: 3px solid #10b981; }
+    .kpi-all { background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-left: 5px solid #4f46e5; color: #312e81; }
+    .kpi-inward { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 5px solid #0284c7; color: #0c4a6e; }
+    .kpi-outward { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-left: 5px solid #d97706; color: #78350f; }
+    .kpi-transit { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 5px solid #2563eb; color: #1e3a8a; }
+    .kpi-overdue { background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%); border-left: 5px solid #e11d48; color: #881337; }
+    .kpi-delivered { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-left: 5px solid #059669; color: #064e3b; }
 
-    /* Overdue Alert Banner */
-    .overdue-alert-banner {
-        background: linear-gradient(90deg, rgba(136, 19, 55, 0.65) 0%, rgba(76, 5, 25, 0.75) 100%);
-        border: 1px solid #f43f5e;
-        border-left: 6px solid #fb7185;
-        border-radius: 12px;
-        padding: 14px 20px;
-        margin: 16px 0;
-        color: #ffe4e6;
-        font-size: 0.9rem;
-        box-shadow: 0 0 25px rgba(244, 63, 94, 0.25);
-    }
-
-    /* ==========================================================
-       DYNAMIC ROW COLOR-CODING FOR STREAMLIT CONTAINERS
-       ========================================================== */
-
-    /* 1. INWARD ROW (Cyan / Teal Theme) */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.row-inward) {
-        background: linear-gradient(90deg, rgba(6, 182, 212, 0.13) 0%, rgba(15, 23, 42, 0.85) 50%, rgba(15, 23, 42, 0.92) 100%) !important;
-        border: 1px solid rgba(6, 182, 212, 0.38) !important;
-        border-left: 6px solid #06b6d4 !important;
-        border-radius: 14px !important;
-        box-shadow: 0 6px 20px -6px rgba(6, 182, 212, 0.18) !important;
-        padding: 6px 10px !important;
-        margin-bottom: 12px !important;
-    }
-
-    /* 2. OUTWARD ROW (Amber / Gold Theme) */
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.row-outward) {
-        background: linear-gradient(90deg, rgba(245, 158, 11, 0.13) 0%, rgba(15, 23, 42, 0.85) 50%, rgba(15, 23, 42, 0.92) 100%) !important;
-        border: 1px solid rgba(245, 158, 11, 0.38) !important;
-        border-left: 6px solid #f59e0b !important;
-        border-radius: 14px !important;
-        box-shadow: 0 6px 20px -6px rgba(245, 158, 11, 0.18) !important;
-        padding: 6px 10px !important;
-        margin-bottom: 12px !important;
-    }
-
-    /* 3. OVERDUE ROW (Crimson / Rose Alert Override) */
-    @keyframes overduePulse {
-        0%, 100% { box-shadow: 0 0 18px rgba(244, 63, 94, 0.28); border-color: rgba(244, 63, 94, 0.75); }
-        50% { box-shadow: 0 0 28px rgba(244, 63, 94, 0.55); border-color: #fda4af; }
-    }
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.row-overdue) {
-        background: linear-gradient(90deg, rgba(225, 29, 72, 0.24) 0%, rgba(69, 10, 26, 0.55) 45%, rgba(15, 23, 42, 0.95) 100%) !important;
-        border: 1.5px solid rgba(244, 63, 94, 0.8) !important;
-        border-left: 7px solid #f43f5e !important;
-        border-radius: 14px !important;
-        animation: overduePulse 2.5s infinite ease-in-out;
-        padding: 6px 10px !important;
-        margin-bottom: 14px !important;
-    }
-
-    /* Badges inside rows */
-    .badge-inward {
-        background: rgba(6, 182, 212, 0.2);
-        color: #67e8f9;
-        border: 1px solid rgba(6, 182, 212, 0.5);
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-    }
-    .badge-outward {
-        background: rgba(245, 158, 11, 0.2);
-        color: #fcd34d;
-        border: 1px solid rgba(245, 158, 11, 0.5);
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-    }
-    .badge-overdue {
-        background: #e11d48;
-        color: #ffffff;
-        border: 1px solid #fda4af;
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 800;
-        letter-spacing: 0.05em;
-        box-shadow: 0 0 12px rgba(225, 29, 72, 0.6);
-    }
-    .badge-due-today {
-        background: rgba(234, 179, 8, 0.25);
-        color: #fde047;
-        border: 1px solid rgba(234, 179, 8, 0.6);
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 700;
-    }
-    .badge-delivered {
-        background: rgba(16, 185, 129, 0.2);
-        color: #6ee7b7;
-        border: 1px solid rgba(16, 185, 129, 0.5);
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 0.72rem;
-        font-weight: 700;
-    }
-    .badge-courier {
-        background: rgba(99, 102, 241, 0.2);
-        color: #c7d2fe;
-        border: 1px solid rgba(99, 102, 241, 0.45);
-        padding: 2px 9px;
-        border-radius: 6px;
-        font-size: 0.72rem;
+    /* Overdue Alert Strip */
+    .overdue-strip {
+        background: #fff1f2;
+        border: 1px solid #fecdd3;
+        border-left: 6px solid #e11d48;
+        color: #9f1239;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        margin: 12px 0;
         font-weight: 600;
     }
+
+    /* Legend Pills */
+    .legend-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-right: 6px;
+    }
+    .pill-inward { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+    .pill-outward { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+    .pill-overdue { background: #ffe4e6; color: #be123c; border: 1px solid #fda4af; }
+    .pill-delivered { background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -217,8 +121,10 @@ COLUMNS = [
     "location",
     "dispatch_date",
     "expected_date",
+    "delivery_date",
     "tracking_link",
-    "current_status"
+    "current_status",
+    "is_deleted"
 ]
 
 COURIER_URLS = {
@@ -235,6 +141,15 @@ COURIER_URLS = {
     "DHL": lambda d: f"https://www.dhl.com/in-en/home/tracking.html?tracking-id={urllib.parse.quote(d)}",
     "Other": lambda d: f"https://www.google.com/search?q={urllib.parse.quote(d + ' courier tracking')}"
 }
+
+STATUS_OPTIONS = [
+    "Dispatched",
+    "In Transit",
+    "Reached Local Hub",
+    "Out for Delivery",
+    "Delivered",
+    "Delayed / Exception"
+]
 
 WEBAPP_URL = st.secrets.get("webapp_url", "")
 
@@ -262,15 +177,14 @@ def post_to_sheet(payload: dict):
     return response.json()
 
 def resolve_tracking_link(courier: str, docket: str, custom_link: str) -> str:
-    if custom_link and custom_link.strip():
-        link = custom_link.strip()
+    if custom_link and str(custom_link).strip():
+        link = str(custom_link).strip()
         return link if link.startswith(("http://", "https://")) else f"https://{link}"
     builder = COURIER_URLS.get(courier, COURIER_URLS["Other"])
-    return builder(docket.strip())
+    return builder(str(docket).strip())
 
 def parse_clean_date(date_str: str):
-    """Safely extracts YYYY-MM-DD from Google Sheets date strings."""
-    if not date_str or str(date_str).strip() == "":
+    if not date_str or str(date_str).strip() in ("", "None", "nan"):
         return None
     clean = str(date_str).strip()[:10]
     try:
@@ -278,53 +192,62 @@ def parse_clean_date(date_str: str):
     except ValueError:
         return None
 
-def evaluate_sla(expected_str: str, current_status: str):
-    """Returns (is_overdue, days_diff, clean_expected_str, is_delivered)"""
-    is_delivered = "delivered" in str(current_status).lower()
-    exp_date = parse_clean_date(expected_str)
+def evaluate_row(row):
+    status_str = str(row.get("current_status", "")).lower()
+    deliv_str = str(row.get("delivery_date", "")).strip()[:10]
+    is_delivered = ("delivered" in status_str) or bool(parse_clean_date(deliv_str))
+    exp_date = parse_clean_date(row.get("expected_date", ""))
     if not exp_date:
-        return False, 0, str(expected_str)[:10], is_delivered
+        return False, 0, is_delivered
     days_diff = (date.today() - exp_date).days
     is_overdue = (days_diff > 0) and (not is_delivered)
-    return is_overdue, days_diff, exp_date.strftime("%Y-%m-%d"), is_delivered
+    return is_overdue, days_diff, is_delivered
 
-# --- Load Data ---
+# --- Load & Filter Active (Non-Deleted) Consignments ---
 try:
-    df = fetch_consignments()
+    raw_df = fetch_consignments()
 except Exception as e:
     st.error(f"Failed to connect to Google Sheet Web App: {e}")
     st.stop()
 
-# Enrich DataFrame with SLA / Overdue calculations
+# Filter out rows that were soft-deleted on the frontend (they remain in Google Sheets)
+if not raw_df.empty:
+    df = raw_df[~raw_df["is_deleted"].str.strip().str.upper().isin(["TRUE", "1", "YES"])].copy()
+else:
+    df = pd.DataFrame(columns=COLUMNS)
+
 if not df.empty:
-    sla_results = df.apply(
-        lambda r: evaluate_sla(r["expected_date"], r["current_status"]),
+    eval_res = df.apply(evaluate_row, axis=1)
+    df["is_overdue"] = [r[0] for r in eval_res]
+    df["days_overdue"] = [r[1] for r in eval_res]
+    df["is_delivered"] = [r[2] for r in eval_res]
+    df["clean_dispatch"] = df["dispatch_date"].apply(lambda x: str(x).strip()[:10])
+    df["clean_expected"] = df["expected_date"].apply(lambda x: str(x).strip()[:10])
+    df["clean_delivery"] = df["delivery_date"].apply(
+        lambda x: str(x).strip()[:10] if str(x).strip() not in ("", "None", "nan") else "—"
+    )
+    df["resolved_url"] = df.apply(
+        lambda r: resolve_tracking_link(r["courier_service"], r["docket_number"], r["tracking_link"]),
         axis=1
     )
-    df["is_overdue"] = [res[0] for res in sla_results]
-    df["days_overdue"] = [res[1] for res in sla_results]
-    df["clean_expected"] = [res[2] for res in sla_results]
-    df["is_delivered"] = [res[3] for res in sla_results]
-    df["clean_dispatch"] = df["dispatch_date"].apply(lambda x: str(x)[:10])
-else:
-    df["is_overdue"] = []
-    df["days_overdue"] = []
-    df["clean_expected"] = []
-    df["is_delivered"] = []
-    df["clean_dispatch"] = []
+    df["sla_tag"] = df.apply(
+        lambda r: f"⚠️ Overdue ({r['days_overdue']}d)" if r["is_overdue"]
+        else ("✅ Delivered" if r["is_delivered"] else "🚚 On Schedule"),
+        axis=1
+    )
 
-# --- Clean Top Header Banner ---
+# --- Top Banner ---
 st.markdown("""
-<center>
-    <div class="hero-banner">
-        <div>
-            <h1 class="hero-title">Logistics Command Center</h1>
-        </div>
+<div class="hero-banner">
+    <div>
+        <h1 class="hero-title">📦 Consignment & Courier Command Center</h1>
+        <p class="hero-subtitle">Compact Tabular Tracker • Live Google Sheets Sync • Safe Archive Deletion</p>
     </div>
-</center>
+    <div class="sync-pill">● Connected to Google Sheets</div>
+</div>
 """, unsafe_allow_html=True)
 
-# --- KPI Summary Bar (6 Engaging Cards) ---
+# --- KPI Cards ---
 total_count = len(df)
 inward_count = int((df["direction"] == "Inward").sum()) if not df.empty else 0
 outward_count = int((df["direction"] == "Outward").sum()) if not df.empty else 0
@@ -334,83 +257,51 @@ active_count = total_count - delivered_count
 
 k1, k2, k3, k4, k5, k6 = st.columns(6)
 with k1:
-    st.markdown(f"""
-    <div class="kpi-card kpi-all">
-        <div class="kpi-label" style="color:#818cf8;">Total Tracked</div>
-        <div class="kpi-value">{total_count}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-all"><div class="kpi-label">Total Active</div><div class="kpi-value">{total_count}</div></div>', unsafe_allow_html=True)
 with k2:
-    st.markdown(f"""
-    <div class="kpi-card kpi-inward">
-        <div class="kpi-label" style="color:#22d3ee;">📥 Inward (Recv)</div>
-        <div class="kpi-value">{inward_count}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-inward"><div class="kpi-label">📥 Inward (Recv)</div><div class="kpi-value">{inward_count}</div></div>', unsafe_allow_html=True)
 with k3:
-    st.markdown(f"""
-    <div class="kpi-card kpi-outward">
-        <div class="kpi-label" style="color:#fbbf24;">📤 Outward (Sent)</div>
-        <div class="kpi-value">{outward_count}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-outward"><div class="kpi-label">📤 Outward (Sent)</div><div class="kpi-value">{outward_count}</div></div>', unsafe_allow_html=True)
 with k4:
-    st.markdown(f"""
-    <div class="kpi-card kpi-transit">
-        <div class="kpi-label" style="color:#60a5fa;">🚚 In Transit</div>
-        <div class="kpi-value">{active_count}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-transit"><div class="kpi-label">🚚 In Transit</div><div class="kpi-value">{active_count}</div></div>', unsafe_allow_html=True)
 with k5:
-    st.markdown(f"""
-    <div class="kpi-card kpi-overdue">
-        <div class="kpi-label" style="color:#fb7185;">⚠️ Overdue SLA</div>
-        <div class="kpi-value" style="color:#fda4af;">{overdue_count}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-overdue"><div class="kpi-label">⚠️ Overdue</div><div class="kpi-value">{overdue_count}</div></div>', unsafe_allow_html=True)
 with k6:
-    st.markdown(f"""
-    <div class="kpi-card kpi-delivered">
-        <div class="kpi-label" style="color:#34d399;">✅ Delivered</div>
-        <div class="kpi-value">{delivered_count}</div>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card kpi-delivered"><div class="kpi-label">✅ Delivered</div><div class="kpi-value">{delivered_count}</div></div>', unsafe_allow_html=True)
 
-# --- Overdue Alert Banner (Shown automatically when any order is past expected delivery date) ---
 if overdue_count > 0:
-    st.markdown(f"""
-    <div class="overdue-alert-banner">
-        <strong>🚨 SLA Breach Alert:</strong> <b>{overdue_count} consignment(s)</b> have passed their Expected Delivery Date and are not yet marked as Delivered. Overdue rows are highlighted in crimson below.
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="overdue-strip">🚨 <b>{overdue_count} consignment(s)</b> are past their Expected Delivery Date and are highlighted in <b>Rose Red</b> in the table below.</div>',
+        unsafe_allow_html=True
+    )
 
 st.write("")
 
-# --- 10-Field Consignment Input Form ---
-with st.container(border=True):
-    st.markdown("#### 📝 Register New Consignment")
-    with st.form("consignment_entry_form", clear_on_submit=True):
-        col1, col2, col3, col4, col5 = st.columns(5)
-
-        with col1:
-            direction = st.selectbox("1. Inward / Outward *", ["Inward", "Outward"])
-            location = st.text_input("6. Location (Route) *", placeholder="e.g., Pune -> Lucknow")
-
-        with col2:
+# --- Collapsible Add New Consignment Form (Keeps Table Front-and-Center) ---
+with st.expander("➕ Register New Consignment (Click to Expand / Collapse)", expanded=(total_count == 0)):
+    with st.form("add_consignment_form", clear_on_submit=True):
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            direction = st.selectbox("1. Movement Type *", ["Inward", "Outward"])
             item_name = st.text_input("2. Item / Consignment Name *", placeholder="e.g., Telemetry Modules")
-            dispatch_date = st.date_input("7. Date of Dispatch *", value=date.today())
-
-        with col3:
-            vendor_name = st.text_input("3. Vendor Name *", placeholder="e.g., Robu.in")
-            expected_date = st.date_input("8. Expected Delivery Date *", value=date.today())
-
-        with col4:
+            vendor_name = st.text_input("3. Vendor / Recipient Name *", placeholder="e.g., Robu.in")
+        with c2:
             courier_service = st.selectbox("4. Courier Service *", list(COURIER_URLS.keys()))
-            tracking_link = st.text_input("9. Tracking Link (Optional)", placeholder="Paste link or leave blank")
-
-        with col5:
             docket_number = st.text_input("5. Docket / AWB Number *", placeholder="e.g., 78491024812")
-            current_status = st.text_input("10. Current Status (Manual) *", value="Dispatched")
+            location = st.text_input("6. Location (Route) *", placeholder="e.g., Pune -> Lucknow")
+        with c3:
+            dispatch_date = st.date_input("7. Date of Dispatch *", value=date.today())
+            expected_date = st.date_input("8. Expected Delivery Date *", value=date.today())
+            has_deliv = st.checkbox("Already Delivered? (Set Delivery Date)")
+        with c4:
+            delivery_date_val = st.date_input("9. Actual Delivery Date (If Delivered)", value=date.today())
+            tracking_link = st.text_input("10. Tracking Link (Optional)", placeholder="Leave blank for auto courier link")
+            current_status = st.text_input("11. Current Status (Manual) *", value="Dispatched")
 
-        submitted = st.form_submit_button("➕ Save Consignment to Google Sheets", type="primary", use_container_width=True)
-
+        submitted = st.form_submit_button("✅ Save Consignment to Google Sheets", type="primary", use_container_width=True)
         if submitted:
             if not item_name.strip() or not docket_number.strip():
-                st.warning("Please enter both the Item / Consignment Name and the Docket Number.")
+                st.warning("Please enter both Item Name and Docket Number.")
             else:
                 record = {
                     "id": f"c-{uuid.uuid4().hex[:8]}",
@@ -422,29 +313,28 @@ with st.container(border=True):
                     "location": location.strip(),
                     "dispatch_date": str(dispatch_date),
                     "expected_date": str(expected_date),
+                    "delivery_date": str(delivery_date_val) if has_deliv else "",
                     "tracking_link": tracking_link.strip(),
-                    "current_status": current_status.strip()
+                    "current_status": "Delivered" if has_deliv and current_status == "Dispatched" else current_status.strip(),
+                    "is_deleted": "FALSE"
                 }
-                with st.spinner("Saving consignment to Google Sheets..."):
+                with st.spinner("Saving to Google Sheets..."):
                     post_to_sheet({"action": "add", "data": record})
-                st.toast(f"Saved {item_name} to Google Sheets!")
+                st.toast(f"Added {item_name}!")
                 st.rerun()
 
-# --- Search & Color-Coded Filter Bar ---
-f_col1, f_col2 = st.columns([2.6, 2.4])
-with f_col1:
-    search_query = st.text_input(
-        "🔍 Search Consignments",
-        placeholder="Search by item name, vendor, docket #, courier, route, or status..."
-    )
-with f_col2:
+# --- Search & Filter Controls ---
+f1, f2 = st.columns([3, 1.5])
+with f1:
+    search_query = st.text_input("🔍 Quick Search Table", placeholder="Type item, vendor, docket #, courier, location, or status...")
+with f2:
     view_filter = st.selectbox(
-        "Filter View",
+        "Filter Rows",
         [
-            "All Consignments",
-            "📥 Inward Only (Cyan)",
-            "📤 Outward Only (Amber)",
-            "⚠️ Overdue / Delayed Only (Crimson)",
+            "All Active Consignments",
+            "📥 Inward Only (Sky Blue)",
+            "📤 Outward Only (Warm Amber)",
+            "⚠️ Overdue Only (Rose Red)",
             "🚚 In Transit / Pending",
             "✅ Delivered Only"
         ]
@@ -471,16 +361,19 @@ if not filtered_df.empty:
         )
         filtered_df = filtered_df[mask]
 
-# Legend + Count Header
-st.markdown(f"""
-<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; margin: 12px 0 10px 0;">
-    <div style="font-size:1.15rem; font-weight:700; color:#f8fafc;">
-        Live Consignment Feed ({len(filtered_df)})
+    # Show newest entries at top of table
+    filtered_df = filtered_df.iloc[::-1].reset_index(drop=True)
+
+# --- Compact Color-Coded Tabular View ---
+st.markdown("""
+<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; margin: 6px 0 8px 0;">
+    <div style="font-size:1.1rem; font-weight:800; color:#1e293b;">
+        📋 Consignment Tracking Table <span style="font-size:0.82rem; font-weight:500; color:#64748b;">(Click any row's checkbox on the left to Edit Details, Add Delivery Date, or Hide)</span>
     </div>
-    <div style="display:flex; gap:10px; align-items:center; font-size:0.75rem;">
-        <span class="badge-inward">📥 Cyan = Inward</span>
-        <span class="badge-outward">📤 Amber = Outward</span>
-        <span class="badge-overdue">⚠️ Crimson Glow = Overdue Past Expected Date</span>
+    <div>
+        <span class="legend-pill pill-inward">📥 Inward Row</span>
+        <span class="legend-pill pill-outward">📤 Outward Row</span>
+        <span class="legend-pill pill-overdue">⚠️ Overdue (Past Expected Date)</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -488,106 +381,172 @@ st.markdown(f"""
 if filtered_df.empty:
     st.info("No consignments match your current filter.")
 else:
-    # Render newest records first
-    for _, row in filtered_df.iloc[::-1].iterrows():
-        is_inward = row["direction"] == "Inward"
-        is_overdue = bool(row["is_overdue"])
-        days_overdue = int(row["days_overdue"])
-        is_delivered = bool(row["is_delivered"])
+    display_cols = [
+        "direction",
+        "item_name",
+        "vendor_name",
+        "courier_service",
+        "docket_number",
+        "location",
+        "clean_dispatch",
+        "clean_expected",
+        "clean_delivery",
+        "current_status",
+        "sla_tag",
+        "resolved_url"
+    ]
+    table_df = filtered_df[display_cols].copy()
 
-        # CSS Marker class determines the entire row container's color scheme
-        if is_overdue:
-            row_theme_class = "row-overdue"
-        elif is_inward:
-            row_theme_class = "row-inward"
+    # Color-code each row based on Overdue vs Inward vs Outward
+    def style_table_rows(row_series):
+        idx = row_series.name
+        is_ovd = bool(filtered_df.loc[idx, "is_overdue"])
+        direction_val = filtered_df.loc[idx, "direction"]
+
+        if is_ovd:
+            # Rose Red highlight for overdue orders
+            return ["background-color: #ffe4e6; color: #9f1239; font-weight: 600;"] * len(row_series)
+        elif direction_val == "Inward":
+            # Soft Sky Cyan for Inward
+            return ["background-color: #e0f2fe; color: #0c4a6e;"] * len(row_series)
         else:
-            row_theme_class = "row-outward"
+            # Soft Warm Amber for Outward
+            return ["background-color: #fef3c7; color: #78350f;"] * len(row_series)
 
-        # Direction Badge HTML
-        dir_badge_html = (
-            '<span class="badge-inward">📥 INWARD (RECEIVING)</span>'
-            if is_inward
-            else '<span class="badge-outward">📤 OUTWARD (DISPATCHED)</span>'
-        )
+    styled_table = table_df.style.apply(style_table_rows, axis=1)
 
-        # SLA / Delivery Status Badge HTML
-        if is_overdue:
-            sla_badge_html = f'<span class="badge-overdue">⚠️ OVERDUE BY {days_overdue} DAY{"S" if days_overdue != 1 else ""}</span>'
-        elif is_delivered:
-            sla_badge_html = '<span class="badge-delivered">✅ DELIVERED</span>'
-        elif days_overdue == 0 and not is_delivered:
-            sla_badge_html = '<span class="badge-due-today">⏰ DUE TODAY</span>'
-        else:
-            days_left = abs(days_overdue)
-            sla_badge_html = f'<span style="color:#94a3b8; font-size:0.75rem; font-weight:600;">⏳ {days_left} day{"s" if days_left != 1 else ""} remaining</span>'
+    selection_event = st.dataframe(
+        styled_table,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "direction": st.column_config.TextColumn("Type", width="small"),
+            "item_name": st.column_config.TextColumn("Item / Consignment", width="medium"),
+            "vendor_name": st.column_config.TextColumn("Vendor", width="medium"),
+            "courier_service": st.column_config.TextColumn("Courier", width="small"),
+            "docket_number": st.column_config.TextColumn("Docket #", width="small"),
+            "location": st.column_config.TextColumn("Location", width="small"),
+            "clean_dispatch": st.column_config.TextColumn("Dispatched", width="small"),
+            "clean_expected": st.column_config.TextColumn("Expected", width="small"),
+            "clean_delivery": st.column_config.TextColumn("Delivered On", width="small"),
+            "current_status": st.column_config.TextColumn("Current Status", width="medium"),
+            "sla_tag": st.column_config.TextColumn("SLA State", width="small"),
+            "resolved_url": st.column_config.LinkColumn(
+                "Track Portal",
+                display_text="🚀 Track ↗",
+                width="small"
+            )
+        }
+    )
 
-        with st.container(border=True):
-            # Inject the hidden CSS hook + rich header strip for this row
-            st.markdown(f"""
-            <div class="{row_theme_class}" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid rgba(148,163,184,0.15);">
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    {dir_badge_html}
-                    <span class="badge-courier">🚚 {row['courier_service']}</span>
-                    <span style="font-size:1.05rem; font-weight:700; color:#ffffff; margin-left:4px;">{row['item_name']}</span>
-                </div>
-                <div>
-                    {sla_badge_html}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+    # --- Edit / Add Delivery Date / Soft-Delete Panel ---
+    st.markdown("---")
+    st.markdown("#### ✏️ Edit Consignment Details, Add Delivery Date, or Remove from View")
 
-            c_details, c_route, c_status, c_actions = st.columns([2.8, 2.5, 2.7, 2.0])
+    # Determine which item is selected (via table click or dropdown selector)
+    selected_rows = selection_event.selection.rows if selection_event and selection_event.selection else []
+    options_map = {
+        f"[{r['direction']}] {r['item_name']} — Docket #{r['docket_number']} ({r['courier_service']})": idx
+        for idx, r in filtered_df.iterrows()
+    }
+    option_labels = list(options_map.keys())
+    default_idx = selected_rows[0] if selected_rows else 0
 
-            with c_details:
-                st.markdown(f"🏢 **Vendor:** {row['vendor_name']}")
-                st.caption("Docket / AWB Number (Click copy icon on right):")
-                st.code(row["docket_number"], language=None)
+    chosen_label = st.selectbox(
+        "Selected Consignment (Click a row in the table above or pick from this list):",
+        options=option_labels,
+        index=default_idx
+    )
+    selected_row = filtered_df.loc[options_map[chosen_label]]
 
-            with c_route:
-                st.markdown(f"📍 **Route:** `{row['location']}`")
-                st.markdown(f"📅 **Dispatched:** {row['clean_dispatch']}")
-                if is_overdue:
-                    st.markdown(
-                        f"🎯 **Expected:** <span style='color:#fda4af; font-weight:800; text-decoration:underline;'>{row['clean_expected']} (PAST DUE)</span>",
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(f"🎯 **Expected:** {row['clean_expected']}")
+    with st.container(border=True):
+        top_bar_col1, top_bar_col2, top_bar_col3 = st.columns([2.5, 1.5, 1.2])
+        with top_bar_col1:
+            st.markdown(f"**Editing:** `{selected_row['item_name']}` &nbsp;|&nbsp; **Docket #:** `{selected_row['docket_number']}`")
+        with top_bar_col2:
+            st.link_button(
+                f"🚀 Open {selected_row['courier_service']} Tracking Page ↗",
+                url=selected_row["resolved_url"],
+                use_container_width=True
+            )
+        with top_bar_col3:
+            if st.button("🗑️ Remove from List (Keep in Sheet)", key=f"soft_del_{selected_row['id']}", use_container_width=True):
+                with st.spinner("Hiding from frontend (keeping record in Google Sheets)..."):
+                    post_to_sheet({"action": "soft_delete", "id": selected_row["id"]})
+                st.toast(f"Removed '{selected_row['item_name']}' from view (data preserved in Google Sheet).")
+                st.rerun()
 
-            with c_status:
-                new_status = st.text_input(
+        with st.form(key=f"edit_form_{selected_row['id']}"):
+            e1, e2, e3, e4 = st.columns(4)
+
+            with e1:
+                edit_direction = st.selectbox(
+                    "Inward / Outward",
+                    ["Inward", "Outward"],
+                    index=0 if selected_row["direction"] == "Inward" else 1
+                )
+                edit_item = st.text_input("Item / Consignment Name", value=selected_row["item_name"])
+                edit_vendor = st.text_input("Vendor Name", value=selected_row["vendor_name"])
+
+            with e2:
+                courier_list = list(COURIER_URLS.keys())
+                c_idx = courier_list.index(selected_row["courier_service"]) if selected_row["courier_service"] in courier_list else 0
+                edit_courier = st.selectbox("Courier Service", courier_list, index=c_idx)
+                edit_docket = st.text_input("Docket / AWB Number", value=selected_row["docket_number"])
+                edit_location = st.text_input("Location (Route)", value=selected_row["location"])
+
+            with e3:
+                disp_dt = parse_clean_date(selected_row["dispatch_date"]) or date.today()
+                exp_dt = parse_clean_date(selected_row["expected_date"]) or date.today()
+                existing_deliv_dt = parse_clean_date(selected_row["delivery_date"])
+
+                edit_dispatch = st.date_input("Date of Dispatch", value=disp_dt)
+                edit_expected = st.date_input("Expected Delivery Date", value=exp_dt)
+                record_delivery = st.checkbox(
+                    "✅ Record / Update Actual Delivery Date",
+                    value=(existing_deliv_dt is not None)
+                )
+
+            with e4:
+                edit_delivery_date = st.date_input(
+                    "Actual Delivery Date",
+                    value=existing_deliv_dt or date.today()
+                )
+                edit_link = st.text_input("Tracking Link", value=selected_row["tracking_link"])
+                edit_status = st.text_input(
                     "Current Status (Manual)",
-                    value=row["current_status"],
-                    key=f"status_{row['id']}"
+                    value=selected_row["current_status"],
+                    help="Tip: Setting a Delivery Date or typing 'Delivered' marks this shipment as completed."
                 )
-                if st.button("💾 Save Manual Status", key=f"save_{row['id']}", use_container_width=True):
-                    with st.spinner("Updating status in Google Sheets..."):
-                        post_to_sheet({
-                            "action": "update_status",
-                            "id": row["id"],
-                            "current_status": new_status.strip()
-                        })
-                    st.toast(f"Status updated for Docket #{row['docket_number']}")
-                    st.rerun()
 
-            with c_actions:
-                st.write("")
-                tracking_url = resolve_tracking_link(
-                    row["courier_service"],
-                    row["docket_number"],
-                    row["tracking_link"]
-                )
-                st.link_button(
-                    f"🚀 Track on {row['courier_service']} ↗",
-                    url=tracking_url,
-                    use_container_width=True,
-                    help=f"Opens {row['courier_service']} tracking website in a new tab"
-                )
-                if st.button("🗑️ Delete Record", key=f"del_{row['id']}", use_container_width=True):
-                    with st.spinner("Deleting from Google Sheets..."):
-                        post_to_sheet({
-                            "action": "delete",
-                            "id": row["id"]
-                        })
-                    st.toast(f"Deleted {row['item_name']}")
-                    st.rerun()
+            save_changes = st.form_submit_button("💾 Save Updated Details to Google Sheets", type="primary", use_container_width=True)
+            if save_changes:
+                final_status = edit_status.strip()
+                if record_delivery and "delivered" not in final_status.lower():
+                    final_status = f"Delivered ({edit_delivery_date})"
+
+                updated_data = {
+                    "id": selected_row["id"],
+                    "direction": edit_direction,
+                    "item_name": edit_item.strip(),
+                    "vendor_name": edit_vendor.strip(),
+                    "courier_service": edit_courier,
+                    "docket_number": edit_docket.strip(),
+                    "location": edit_location.strip(),
+                    "dispatch_date": str(edit_dispatch),
+                    "expected_date": str(edit_expected),
+                    "delivery_date": str(edit_delivery_date) if record_delivery else "",
+                    "tracking_link": edit_link.strip(),
+                    "current_status": final_status,
+                    "is_deleted": "FALSE"
+                }
+                with st.spinner("Updating record in Google Sheets..."):
+                    post_to_sheet({
+                        "action": "edit",
+                        "id": selected_row["id"],
+                        "data": updated_data
+                    })
+                st.toast(f"Updated '{edit_item}' in Google Sheets!")
+                st.rerun()

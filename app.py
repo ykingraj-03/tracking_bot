@@ -6,7 +6,7 @@ import urllib.parse
 import uuid
 
 st.set_page_config(
-    page_title="Consignment Command Center",
+    page_title="Logistic Command Center",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -240,8 +240,7 @@ if not df.empty:
 st.markdown("""
 <div class="hero-banner">
     <div>
-        <h1 class="hero-title">📦 Consignment & Courier Command Center</h1>
-        <p class="hero-subtitle">Compact Tabular Tracker • Live Google Sheets Sync • Safe Archive Deletion</p>
+        <h1 class="hero-title">Logistic Command Center</h1>
     </div>
     <div class="sync-pill">● Connected to Google Sheets</div>
 </div>
